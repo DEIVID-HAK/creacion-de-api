@@ -1,0 +1,65 @@
+name: todo-api
+
+services:
+  # Servicio de Base de Datos PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: todo-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: todo
+      POSTGRES_PASSWORD: todo123
+      POSTGRES_DB: tododb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todo -d tododb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - todo-network
+
+  # Servicio de la API
+  api:
+    build: .
+    container_name: todo-api
+    restart: always
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgres://todo:todo123@db:5432/tododb
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+    command: npm run dev
+    networks:
+      - todo-network
+
+  # (Opcional) Interfaz grafica para PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: todo-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@todoapi.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5080:80"
+    depends_on:
+      - db
+    networks:
+      - todo-network
+
+networks:
+  todo-network:
+    driver: bridge
+
+volumes:
+  pg_data:

@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Balanceador de Carga NGINX
+  load_balancer:
+    image: nginx:alpine
+    container_name: techsolutions_lb
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend_node1
+      - backend_node2
+    networks:
+      - ha_network
+    restart: always
+
+  # Nodo 1 de Aplicación Backend
+  backend_node1:
+    image: python:3.12-slim
+    container_name: techsolutions_app_node1
+    command: ["python3", "/app/app.py", "Node-1 (Primary)"]
+    volumes:
+      - ./backend/app.py:/app/app.py:ro
+    networks:
+      - ha_network
+    restart: always
+
+  # Nodo 2 de Aplicación Backend
+  backend_node2:
+    image: python:3.12-slim
+    container_name: techsolutions_app_node2
+    command: ["python3", "/app/app.py", "Node-2 (Secondary)"]
+    volumes:
+      - ./backend/app.py:/app/app.py:ro
+    networks:
+      - ha_network
+    restart: always
+
+  # Base de Datos Principal (PostgreSQL 17 Primary)
+  db_primary:
+    image: postgres:17-alpine
+    container_name: techsolutions_db_primary
+    environment:
+      POSTGRES_DB: techsolutions_db
+      POSTGRES_USER: postgres_admin
+      POSTGRES_PASSWORD: SecurePassword123!
+    ports:
+      - "5432:5432"
+    networks:
+      - ha_network
+
+  # Base de Datos Réplica (PostgreSQL 17 Standby)
+  db_replica:
+    image: postgres:17-alpine
+    container_name: techsolutions_db_replica
+    environment:
+      POSTGRES_DB: techsolutions_db
+      POSTGRES_USER: postgres_admin
+      POSTGRES_PASSWORD: SecurePassword123!
+    ports:
+      - "5433:5432"
+    depends_on:
+      - db_primary
+    networks:
+      - ha_network
+
+networks:
+  ha_network:
+    driver: bridge
